@@ -1,5 +1,5 @@
 ###
-  @TODO have s and l be static
+  @TODO have s and l be static ! using format "H:40+100 S:30% L:50%"
 ###
 
 # User Param -  mdofiy these to changes speed/etc
@@ -86,6 +86,7 @@ class Jsrp_svg
     return
 
   # @TODO check for defs and create if it doesnt exist
+  # @TODO calculate cx, cy and r
   format_gradient_def: () ->
     @dom_id = "jsrp_grad_"+total_active_gradients
     _fillID = "url(#jsrp_grad_"+total_active_gradients+")"
