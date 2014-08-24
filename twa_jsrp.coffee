@@ -1,9 +1,7 @@
-###
-  @TODO have s and l be static ! using format "H:40+100 S:30% L:50%"
-###
+# @TODO use speed from DOM object for each jsrp objects rate
 
 # User Param -  mdofiy these to changes speed/etc
-pulse_speed = 50
+pulse_speed = 15
 
 ###
  INIT
@@ -43,6 +41,35 @@ format_jsrp = (_jsrp_dom) ->
   else
 
 
+
+###
+  Parses the values from the DOM Attr and returns them as
+  an appropriately formatted array. This is done by retrieving
+  the core hsl values as well as the speed in seconds @TODO stroke/fill
+
+  @param {String} _dom_string - string retrieved by the dom
+  @RETURN {array} - an array of mixed types and values
+    @val {array} _h - hue movement range
+    @val {int} _s - satruation percent as int
+    @val {int} _l - lightness percent as int
+    @val {int} _speed - speed for each step of the cycles
+###
+parse_jsrp_attr = (_dom_string) ->
+  _split_dom = _dom_string.split(" ")
+  _i = 0
+  while _i < _split_dom.length
+    switch _split_dom[_i].charAt(0)
+      when "H" then _h = _split_dom[_i].substring(2, _split_dom[_i].length-1)
+      when "S" then _s = parseInt _split_dom[_i].substring(2, _split_dom[_i].length-1)
+      when "L" then _l = parseInt _split_dom[_i].substring(2, _split_dom[_i].length-1)
+    if _split_dom[_i].charAt( _split_dom[_i].length - 1 ) is "s"
+      _speed = _split_dom[_i].substring(0,_split_dom[_i].length-1)
+      _speed = parseInt( (parseFloat _speed)*1000  / 360 )
+    _i++
+  _h = _h.split("->")
+  return [_h, _s, _l, _speed]
+
+
 total_active_gradients = 0 #tracks total number of active gradients for svg naming
 ###
  class structure for jsrp object for an SVG element
@@ -64,28 +91,25 @@ class Jsrp_svg
     @parse_color(@jsrp_dom.getAttribute("data-jsrp"))
 
   parse_color: (raw_color) ->
-    color_data = raw_color.split(" ")
-    @base_hsl_stop1 = @hsl_split(color_data,0)
-    @base_hsl_stop2 = @hsl_split(color_data,1)
-    @stops = [@base_hsl_stop1, @base_hsl_stop2]
-    @max_hsl = [306,100,100]
+    color_data = parse_jsrp_attr raw_color
+    @stops = color_data[0]
+    @s     = color_data[1]
+    @l     = color_data[2]
+    @speed = color_data[3]
     return
 
   advance_color: () ->
-    _s=0
-    while _s < @stops.length
-      _i=0
-      while _i < @stops[_s].length
-        if @stops[_s][_i] < @max_hsl[_i]
-          @stops[_s][_i]++
-        else
-          @stops[_s][_i] = 0
-        _i++
-      _s++
+    _i=0
+    while _i < @stops.length
+      if @stops[_i] < 360
+        @stops[_i]++
+      else
+        @stops[_i] = 0
+      _i++
     @set_updated_gradient()
     return
 
-  # @TODO check for defs and create if it doesnt exist
+  # @TODO check for <defs> and create if it doesnt exist
   # @TODO calculate cx, cy and r
   format_gradient_def: () ->
     @dom_id = "jsrp_grad_"+total_active_gradients
@@ -102,13 +126,11 @@ class Jsrp_svg
   set_updated_gradient: () ->
     @parent_node.getElementById(@dom_id).innerHTML =
       """
-      <stop  offset="0" style="stop-color:hsl(#{@stops[0][0]},#{@stops[0][1]}%,#{@stops[0][2]}%);"/>
-      <stop  offset="1" style="stop-color:hsl(#{@stops[1][0]},#{@stops[1][1]}%,#{@stops[1][2]}%);"/>
+      <stop  offset="0" style="stop-color:hsl(#{@stops[1]},#{@s}%,#{@l}%);"/>
+      <stop  offset="1" style="stop-color:hsl(#{@stops[0]},#{@s}%,#{@l}%);"/>
       """
     return
 
-  hsl_split: (_color_data,_key) ->
-    parseInt hsl.split(",")[_key] for hsl in _color_data
 
 ###
 ////////////////////////////////////
