@@ -2,13 +2,15 @@
 (function() {
   var Jsrp_svg, format_jsrp, log, parse_jsrp_attr, pulse_speed, retrieve_all_pulse_objects, total_active_gradients;
 
-  pulse_speed = 15;
+  pulse_speed = 10;
 
 
   /*
    INIT
    parses dom, and formats array of objects
    cycles through objects applying pulse effect
+    *
+   @since v0.1
    */
 
   document.addEventListener("DOMContentLoaded", function() {
@@ -28,7 +30,10 @@
 
   /*
    Retrieve and format all dom elements with .jsrp into jsrp_obj_array
+    *
    @RETURN an array of formatted object for specific tag types
+    *
+   @since v0.1
    */
 
   retrieve_all_pulse_objects = function() {
@@ -45,8 +50,11 @@
 
   /*
    preps a dom object for object creation and passes to class/constructor
+    *
    @param {DOM object} _jsrp_dom
    @RETURN a formatted jsrp type object
+    *
+   @since v0.1
    */
 
   format_jsrp = function(_jsrp_dom) {
@@ -68,23 +76,25 @@
     Parses the values from the DOM Attr and returns them as
     an appropriately formatted array. This is done by retrieving
     the core hsl values as well as the speed in seconds @TODO stroke/fill
-  
+     *
     @param {String} _dom_string - string retrieved by the dom
     @RETURN {array} - an array of mixed types and values
       @val {array} _h - hue movement range
       @val {int} _s - satruation percent as int
       @val {int} _l - lightness percent as int
       @val {int} _speed - speed for each step of the cycles
+     *
+    @since v0.1
    */
 
   parse_jsrp_attr = function(_dom_string) {
-    var _h, _i, _l, _s, _speed, _split_dom;
+    var _h, _i, _l, _s, _split_dom, _steps;
     _split_dom = _dom_string.split(" ");
     _i = 0;
     while (_i < _split_dom.length) {
       switch (_split_dom[_i].charAt(0)) {
         case "H":
-          _h = _split_dom[_i].substring(2, _split_dom[_i].length - 1);
+          _h = _split_dom[_i].substring(2, _split_dom[_i].length);
           break;
         case "S":
           _s = parseInt(_split_dom[_i].substring(2, _split_dom[_i].length - 1));
@@ -93,74 +103,141 @@
           _l = parseInt(_split_dom[_i].substring(2, _split_dom[_i].length - 1));
       }
       if (_split_dom[_i].charAt(_split_dom[_i].length - 1) === "s") {
-        _speed = _split_dom[_i].substring(0, _split_dom[_i].length - 1);
-        _speed = parseInt((parseFloat(_speed)) * 1000 / 360);
+        _steps = _split_dom[_i].substring(0, _split_dom[_i].length - 1);
+        _steps = parseInt((parseFloat(_steps)) * 1000 / 360);
       }
       _i++;
     }
     _h = _h.split("->");
-    return [_h, _s, _l, _speed];
+    return [_h, _s, _l, _steps];
   };
 
   total_active_gradients = 0;
 
 
   /*
-   class structure for jsrp object for an SVG element
-   @method constructor - initialized object and gets relevent information
-   @method parse_color - parses colors into local params
-    @param {String} raw_color - attr from dom formatted as "h1,h2 s1,s2 b1,b2"
-   @mathod advance_color - increments the color within its ranges
-   @method hsl_split - splits an array of format ["h1,h2", "s1,s2", "b1,b2"]
-    into and array with format hx,sx,bx
-    @param {Array} _color_data - format ["h1,h2", "s1,s2", "b1,b2"]
-    @param {int} _key -  index for sub array (x)
-   @method set_updated_gradient - formats and sets the gradient stops into the DOM
+    Jsrp_svg
+    Object for JSRP made for an svg child node
+    Controls parse of information and aniamtion of pulse
+     *
+    @jsrp_dom
+    @parent_node  - svg parent container
+    @dom_id       - id of gradient element in dom
+     *
+    @since v0.1
    */
 
   Jsrp_svg = (function() {
+
+    /*
+      initialized object and gets relevent information
+      @param {DOM object} jsrp_dom - @see parent
+      @param {DOM object} parent_node - @see parent
+     */
     function Jsrp_svg(jsrp_dom, parent_node) {
       this.jsrp_dom = jsrp_dom;
       this.parent_node = parent_node;
       total_active_gradients++;
+      this.parse_jsrp_params(this.jsrp_dom.getAttribute("data-jsrp"));
       this.format_gradient_def();
-      this.parse_color(this.jsrp_dom.getAttribute("data-jsrp"));
     }
 
-    Jsrp_svg.prototype.parse_color = function(raw_color) {
+
+    /*
+      parses parameters for jsrp object
+      or sets default values
+       *
+      @param {String} raw_jsrp_data - raw data input from string value
+     */
+
+    Jsrp_svg.prototype.parse_jsrp_params = function(raw_jsrp_data) {
       var color_data;
-      color_data = parse_jsrp_attr(raw_color);
+      color_data = parse_jsrp_attr(raw_jsrp_data);
       this.stops = color_data[0];
       this.s = color_data[1];
       this.l = color_data[2];
-      this.speed = color_data[3];
+      this.steps = color_data[3];
+      this.base_color = this.stops[0];
     };
 
+
+    /*
+      increments the cbase color value
+     */
+
     Jsrp_svg.prototype.advance_color = function() {
-      var _i;
-      _i = 0;
-      while (_i < this.stops.length) {
-        if (this.stops[_i] < 360) {
-          this.stops[_i]++;
-        } else {
-          this.stops[_i] = 0;
-        }
-        _i++;
-      }
+      this.base_color--;
       this.set_updated_gradient();
     };
 
+
+    /*
+      Formats and inserts the radial gradeint elemtnt into the dom
+     */
+
     Jsrp_svg.prototype.format_gradient_def = function() {
-      var _defs, _fillID;
+      var _cx, _cy, _defs, _fillID;
       this.dom_id = "jsrp_grad_" + total_active_gradients;
       _fillID = "url(#jsrp_grad_" + total_active_gradients + ")";
+      _cx = this.jsrp_dom.getBoundingClientRect().width / 2;
+      _cy = this.jsrp_dom.getBoundingClientRect().height / 2;
+      log(_cx);
       _defs = this.parent_node.getElementsByTagName("defs")[0];
-      _defs.innerHTML = _defs.innerHTML + ("<radialGradient id=\"jsrp_grad_" + total_active_gradients + "\" cx=\"62.5\" cy=\"62.5\" r=\"87.0057\" gradientUnits=\"userSpaceOnUse\">\n</radialGradient>");
-      return this.jsrp_dom.setAttribute("fill", _fillID);
+      _defs.innerHTML = _defs.innerHTML + ("<radialGradient id=\"jsrp_grad_" + total_active_gradients + "\" cx=\"" + _cx + "\" cy=\"" + _cy + "\" r=\"" + _cx + "\" gradientUnits=\"userSpaceOnUse\">\n</radialGradient>");
+      this.jsrp_dom.setAttribute("fill", _fillID);
+      return this.set_gradient_steps();
     };
 
+
+    /*
+    * Sets up the initial stops for the radial gradients
+    * Fixes steps range for pulsing
+     */
+
+    Jsrp_svg.prototype.set_gradient_steps = function() {
+      var _gradient_steps, _inc, _on_step;
+      this.steps = this.steps - 1;
+      _gradient_steps = "";
+      _inc = 0;
+      while (_inc < this.steps + 1) {
+        _on_step = _inc * (1 / this.steps);
+        _gradient_steps += "<stop offset=\"" + (Math.floor(_on_step * 100)) + "%\" style=\"\"/>";
+        _inc++;
+      }
+      this.parent_node.getElementById(this.dom_id).innerHTML = _gradient_steps;
+    };
+
+
+    /*
+      * Updates the hsb values for radial gradient stops
+      * adds range variation to base color for each step/stop node
+     */
+
     Jsrp_svg.prototype.set_updated_gradient = function() {
-      this.parent_node.getElementById(this.dom_id).innerHTML = "<stop  offset=\"0\" style=\"stop-color:hsl(" + this.stops[1] + "," + this.s + "%," + this.l + "%);\"/>\n<stop  offset=\"1\" style=\"stop-color:hsl(" + this.stops[0] + "," + this.s + "%," + this.l + "%);\"/>";
+      var node, stop_nodes, _i, _inc, _len;
+      stop_nodes = this.parent_node.getElementById(this.dom_id).querySelectorAll("stop");
+      this.range_stops = (this.stops[1] - this.stops[0]) / this.steps;
+      _inc = 0;
+      for (_i = 0, _len = stop_nodes.length; _i < _len; _i++) {
+        node = stop_nodes[_i];
+        this.pulse(node, _inc);
+        _inc++;
+      }
+    };
+
+
+    /*
+    * Performs the actual calculatioon of step values
+    * and their attachment to htm/svg node
+    * @param {DOM element} node - <stop> node
+    * @param {int} _in - node item to mofidy in order
+     */
+
+    Jsrp_svg.prototype.pulse = function(node, _inc) {
+      var _color, _new_color;
+      _color = this.base_color + this.range_stops * _inc;
+      _new_color = "stop-color:hsl(" + _color + "," + this.s + "%," + this.l + "%);";
+      return node.setAttribute("style", _new_color);
     };
 
     return Jsrp_svg;
