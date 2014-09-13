@@ -41,7 +41,7 @@ format_jsrp = (_jsrp_dom) ->
   parent_tag = _jsrp_dom.parentNode.tagName
   parent_node = _jsrp_dom.parentNode
 
-  if parent_tag == "g"
+  if parent_tag == "g" # @TODO move up through ALL <g>s
     parent_node = _jsrp_dom.parentNode.parentNode
 
   if parent_node.tagName == "svg"
@@ -131,7 +131,8 @@ class Jsrp_svg
     Formats and inserts the radial gradeint elemtnt into the dom
   ###
   # @TODO check for <defs> and create if it doesnt exist
-  # @TODO calculate cx, cy and r
+  # @TODO calculate cx, cy properly
+  # @TODO and r properly, based on cx cy
   format_gradient_def: () ->
     @dom_id = "jsrp_grad_"+total_active_gradients
     _fillID = "url(#jsrp_grad_"+total_active_gradients+")"
